@@ -1,0 +1,305 @@
+<!doctype html>
+<html>
+<head>
+  <base href="https://cdn.jsdelivr.net/gh/hummingbird-9/web86-64/">
+    <title>64-bit Browser Emulator</title>
+    <style>
+        body { background: #1a1a1a; color: #00ff00; font-family: 'Courier New', monospace; text-align: center; margin: 0; padding: 20px; overflow-x: hidden; }
+        #screen_container { 
+            margin: 20px auto; 
+            background: #000; 
+            border: 5px solid #333;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            display: inline-block; 
+            position: relative;
+        }
+        canvas { display: block; image-rendering: pixelated; }
+        
+        /* Console Styles - Top Right */
+        #log-console {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 300px;
+            height: 200px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #00ff00;
+            border: 1px solid #444;
+            font-size: 11px;
+            text-align: left;
+            padding: 10px;
+            overflow-y: auto;
+            z-index: 1000;
+            pointer-events: none; /* Allows clicks to pass through if needed */
+        }
+
+        .controls { 
+            background: #222;
+            padding: 20px; 
+            border: 1px solid #444; 
+            display: inline-block; 
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        input, button, textarea { 
+            background: #333; color: #fff; border: 1px solid #555; 
+            padding: 8px; border-radius: 4px; cursor: pointer;
+        }
+        button:hover { background: #444; border-color: #00ff00; }
+        #status { color: #aaa; font-size: 0.9em; margin-top: 10px; }
+        .row { margin-bottom: 12px; }
+        label { margin-right: 8px; color: #ccc; }
+    </style>
+</head>
+<body>
+
+    <div id="log-console">--- SYSTEM LOGS ---<br></div>
+
+    <h1>64-bit OS Web Runner</h1>
+    
+    <div class="controls">
+        <div class="row" style="margin-bottom: 15px;">
+            <label for="iso-file">Select ISO:</label>
+            <input type="file" id="iso-file" accept=".iso">
+        </div>
+        <div class="row">
+            <label>RAM (MB):</label>
+            <input type="number" id="ram-size" value="1024" min="256" max="4096">
+            <button id="start-btn">BOOT ISO</button>
+            <button id="fullscreen-btn">FULLSCREEN</button>
+        </div>
+
+        <hr style="border-color:#333; margin:12px 0;">
+
+        <!-- Network controls -->
+        <div class="row">
+            <label for="enable-network"><input type="checkbox" id="enable-network"> Enable Network</label>
+        </div>
+        <div class="row">
+            <label for="relay-url">Network Relay URL:</label>
+            <input type="text" id="relay-url" placeholder="wss://your-relay.example.com/" style="width: 250px;">
+        </div>
+        <div style="font-size: 0.85em; color: #999; text-align:left; margin-top:8px;">
+            Note: A "Wi‑Fi" connection from a web page is not possible — the browser cannot change the host's Wi‑Fi. Enabling the network will connect the emulated OS to the network via a v86 network relay (a WebSocket relay) so the guest can access the internet through your browser's network connection.
+        </div>
+
+        <hr style="border-color:#333; margin:12px 0;">
+
+        <!-- Log file controls -->
+        <div class="row">
+            <button id="save-logs-btn">Select Log File (Save)</button>
+            <button id="close-logs-btn">Close Log File</button>
+            <button id="download-logs-btn">Download Logs (fallback)</button>
+        </div>
+
+        <div id="status">Ready.</div>
+    </div>
+
+    <br>
+
+    <div id="screen_container">
+        <div style="white-space: pre; font-family: Courier, monospace; font-size: 14px;"></div>
+        <canvas></canvas>
+    </div>
+
+    <script src="lib/libv86.js"></script>
+    <script>
+        const logBox = document.getElementById("log-console");
+        const startBtn = document.getElementById("start-btn");
+        const status = document.getElementById("status");
+        const saveLogsBtn = document.getElementById("save-logs-btn");
+        const closeLogsBtn = document.getElementById("close-logs-btn");
+        const downloadLogsBtn = document.getElementById("download-logs-btn");
+
+        // File System Access handles (optional)
+        let logFileHandle = null;
+        let logFileWritable = null;
+        let inMemoryLogs = []; // fallback buffer for download
+
+        function appendLogToMemory(line) {
+            inMemoryLogs.push(line + "\n");
+            // keep memory bounded (simple policy)
+            if (inMemoryLogs.length > 10000) inMemoryLogs.shift();
+        }
+
+        async function openLogFileForWriting() {
+            if (!window.showSaveFilePicker) {
+                customLog("File System Access API not supported in this browser. Using download fallback.");
+                return;
+            }
+
+            try {
+                const opts = {
+                    types: [
+                        {
+                            description: 'Text files',
+                            accept: { 'text/plain': ['.txt', '.log'] },
+                        },
+                    ],
+                };
+                logFileHandle = await window.showSaveFilePicker(opts);
+                logFileWritable = await logFileHandle.createWritable();
+                customLog("Log file opened for writing.");
+                // write existing buffered logs to file
+                if (inMemoryLogs.length) {
+                    await logFileWritable.write(inMemoryLogs.join(''));
+                    inMemoryLogs = [];
+                }
+            } catch (e) {
+                customLog("Log file open cancelled or failed: " + e.message);
+            }
+        }
+
+        async function closeLogFile() {
+            if (logFileWritable) {
+                await logFileWritable.close();
+                logFileWritable = null;
+                logFileHandle = null;
+                customLog("Log file closed.");
+            } else {
+                customLog("No log file open.");
+            }
+        }
+
+        async function writeLineToLogFile(line) {
+            try {
+                if (logFileWritable) {
+                    await logFileWritable.write(line + "\n");
+                } else {
+                    // fallback to buffering in memory for later download
+                    appendLogToMemory(line);
+                }
+            } catch (e) {
+                appendLogToMemory(line);
+                customLog("Failed to write to file: " + e.message);
+            }
+        }
+
+        function downloadLogsFallback() {
+            const blob = new Blob(inMemoryLogs, { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'v86-logs.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+            customLog("Logs downloaded (fallback).");
+        }
+
+        function customLog(message) {
+            const line = `[${new Date().toLocaleTimeString()}] ${message}`;
+            const entry = document.createElement("div");
+            entry.innerText = line;
+            logBox.appendChild(entry);
+            logBox.scrollTop = logBox.scrollHeight;
+            console.log(message);
+            // write to file (async, don't wait)
+            writeLineToLogFile(line).catch(err => console.error(err));
+        }
+
+        saveLogsBtn.onclick = function() {
+            openLogFileForWriting();
+        };
+        closeLogsBtn.onclick = function() {
+            closeLogFile();
+        };
+        downloadLogsBtn.onclick = function() {
+            downloadLogsFallback();
+        };
+
+        document.getElementById("fullscreen-btn").onclick = function() {
+            const elem = document.getElementById("screen_container");
+            if (elem.requestFullscreen) elem.requestFullscreen();
+            customLog("Entering Fullscreen Mode");
+        };
+
+        startBtn.onclick = function() {
+            const fileInput = document.getElementById("iso-file");
+            const ramSize = parseInt(document.getElementById("ram-size").value);
+
+            if (fileInput.files.length === 0) {
+                alert("Please select an ISO file!");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const isoURL = URL.createObjectURL(file);
+            
+            status.innerText = "Attempting to launch engine...";
+            customLog(`Loading ISO: ${file.name}`);
+            startBtn.disabled = true;
+
+            // Base emulator config
+            const config = {
+                wasm_path: "webassembly/v86_64.wasm", 
+                memory_size: ramSize * 1024 * 1024,
+                vga_canvas: document.querySelector("#screen_container canvas"),
+                screen_container: document.querySelector("#screen_container"),
+                bios: { url: "bios/seabios.bin" }, 
+                vga_bios: { url: "bios/vgabios.bin" },
+                cdrom: { url: isoURL },
+                autostart: true,
+                // audio: ... (left default)
+            };
+
+            // If user asked to enable network, attach a network_relay_url.
+            // NOTE: Browsers cannot control the host's Wi-Fi. This simply
+            // gives the emulated guest a path to the network via a WebSocket relay.
+            const enableNetwork = document.getElementById("enable-network").checked;
+            const relayUrl = document.getElementById("relay-url").value.trim();
+            if (enableNetwork) {
+                if (!relayUrl) {
+                    customLog("Network enabled but no relay URL provided. Aborting network setup.");
+                } else {
+                    // v86 supports a network_relay_url option when built with
+                    // the network relay client functionality. Provide the relay URL.
+                    config.network_relay_url = relayUrl;
+                    customLog(`Network relay set to: ${relayUrl}`);
+                    // Optionally instruct the emulator to enable network (some builds auto-use relay URL)
+                    config.network = true;
+                }
+            }
+
+            try {
+                // Auto-detect constructor name (some use V86, some use V86Starter)
+                const Emulator = window.V86Starter || window.V86;
+                if (!Emulator) {
+                    throw new Error("v86 Library not loaded. Check lib/libv86.js path.");
+                }
+
+                const emulator = new Emulator(config);
+
+                emulator.add_listener("emulator-ready", function() {
+                    status.innerText = "Running: " + file.name;
+                    customLog("v86 Engine Ready. Booting...");
+                });
+
+                // Optional: listen for v86 console messages and mirror to our log/file
+                try {
+                    emulator.add_listener("serial0-output-char", function(chr) {
+                        // This gives us raw serial console chars from the emulated guest.
+                        // Buffer and write them to the log UI (grouped per newline).
+                        // Simple implementation: append printable characters.
+                        customLog("guest: " + chr);
+                    });
+                } catch (e) {
+                    customLog("Could not attach serial listener: " + e.message);
+                }
+
+                // When the page unloads, try to close file handles cleanly
+                window.addEventListener('beforeunload', function() {
+                    if (logFileWritable) {
+                        // don't await in unload; best-effort close
+                        logFileWritable.close().catch(() => {});
+                    }
+                });
+            } catch (e) {
+                customLog(`CRITICAL ERROR: ${e.message}`);
+                status.innerText = "Failed to launch.";
+                startBtn.disabled = false;
+            }
+        };
+    </script>
+
+</body>
+</html>
