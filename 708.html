@@ -2,13 +2,15 @@
 <html lang="en-us">
 
 <head>
-    <base href="https://cdn.jsdelivr.net/gh/hummingbird-9/hollow-knight@main/">
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <base href="https://cdn.jsdelivr.net/gh/aukak/hollow-knight@2fc2e7149f0d5b2609b135ab48f00fd973930635/">
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>Unity WebGL Player | Hollow Knight</title>
-    <link rel="shortcut icon" href="TemplateData/favicon.ico">
-    <link rel="stylesheet" href="TemplateData/style.css">
+    <link rel="shortcut icon" href="TemplateData/favicon.ico" />
+    <link rel="stylesheet" href="TemplateData/style.css" />
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=EB+Garamond&display=swap');
+
         html,
         body {
             margin: 0;
@@ -26,21 +28,28 @@
             left: 0;
         }
 
-        /* Added style for the canvas to fill its container */
+        #loading-text {
+            color: white;
+            font-size: 48px;
+            font-family: 'EB Garamond', Arial, serif;
+            text-align: center;
+            margin-top: 20px;
+        }
+
         #unity-canvas {
             width: 100%;
             height: 100%;
             background: #231F20;
-            /* Ensures background matches body if canvas is transparent */
         }
 
-        /* Styles for the instruction text */
+        /* --- Debug console, fps viewer and instructions styles --- */
+
         #instruction-text {
             position: fixed;
             top: 10px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0,0,0,0.7);
+            background: rgba(0, 0, 0, 0.7);
             color: white;
             padding: 10px 20px;
             border-radius: 5px;
@@ -50,53 +59,50 @@
             display: none;
         }
 
-        /* Styles for the Developer Console */
         #dev-console {
-            position: absolute; /* Changed from fixed to absolute for dragging */
+            position: absolute;
             top: 0;
             right: 0;
-            /* Removed fixed width/height, will be managed by JS */
-            min-width: 200px; /* Minimum size for resizing */
+            min-width: 200px;
             min-height: 100px;
-            /* Use CSS variables for dynamic background and opacity */
-            background: var(--console-bg-color, rgba(0, 0, 0, 0.8));
-            color: #0f0; /* Default text color, will be overridden by log types */
+            background: rgba(0, 0, 0, 0.8);
+            color: #0f0;
             font-family: monospace;
             font-size: 12px;
-            overflow: hidden; /* Hide content overflow, scrollbar on output div */
-            padding: 0; /* Padding moved to inner elements */
+            overflow: hidden;
+            padding: 0;
             box-sizing: border-box;
             z-index: 999;
             display: none;
         }
 
-        #dev-console-header { /* Style for the console header */
+        #dev-console-header {
             color: #fff;
             border-bottom: 1px solid #333;
             padding: 5px 10px;
             margin-bottom: 5px;
             cursor: grab;
             box-sizing: border-box;
-            height: 25px; /* Fixed height for header */
+            height: 25px;
             display: flex;
             align-items: center;
-            justify-content: space-between; /* To push settings icon to the right */
-            /* Use CSS variable for dynamic header background */
-            background: var(--console-header-bg-color, rgba(0, 0, 0, 0.8));
+            justify-content: space-between;
+            background: rgba(0, 0, 0, 0.8);
         }
 
-        #dev-console-output { /* Apply scroll to the content area */
-            height: calc(100% - 25px); /* Take remaining height after header */
+        #dev-console-output {
+            height: calc(100% - 25px);
             overflow-y: scroll;
             padding: 5px 10px;
             box-sizing: border-box;
+            white-space: pre-wrap;
+            word-break: break-word;
         }
 
-        /* Styles for the FPS viewer */
         #fps-viewer {
-            position: absolute; /* Changed from fixed to absolute for dragging */
+            position: absolute;
             top: 10px;
-            left: 10px; /* Already top-left */
+            left: 10px;
             background: rgba(0, 0, 0, 0.7);
             color: #0f0;
             font-family: monospace;
@@ -105,30 +111,80 @@
             border-radius: 3px;
             z-index: 998;
             display: none;
-            cursor: grab; /* Makes it draggable */
+            cursor: grab;
         }
 
-        /* Resizer handles for draggable/resizable elements */
         .resizer {
-            background: rgba(255, 255, 255, 0.1); /* Lighter background for visibility */
+            background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
             position: absolute;
             z-index: 10000;
         }
 
-        /* Corner resizers */
-        .resizer.nw { width: 10px; height: 10px; top: -5px; left: -5px; cursor: nw-resize; }
-        .resizer.ne { width: 10px; height: 10px; top: -5px; right: -5px; cursor: ne-resize; }
-        .resizer.se { width: 10px; height: 10px; bottom: -5px; right: -5px; cursor: se-resize; }
-        .resizer.sw { width: 10px; height: 10px; bottom: -5px; left: -5px; cursor: sw-resize; }
+        .resizer.nw {
+            width: 10px;
+            height: 10px;
+            top: -5px;
+            left: -5px;
+            cursor: nw-resize;
+        }
 
-        /* Side resizers */
-        .resizer.n { width: calc(100% - 10px); height: 5px; top: -3px; left: 5px; cursor: n-resize; }
-        .resizer.s { width: calc(100% - 10px); height: 5px; bottom: -3px; left: 5px; cursor: s-resize; }
-        .resizer.e { width: 5px; height: calc(100% - 10px); top: 5px; right: -3px; cursor: e-resize; }
-        .resizer.w { width: 5px; height: calc(100% - 10px); top: 5px; left: -3px; cursor: w-resize; }
+        .resizer.ne {
+            width: 10px;
+            height: 10px;
+            top: -5px;
+            right: -5px;
+            cursor: ne-resize;
+        }
 
-        /* Styles for the console settings UI */
+        .resizer.se {
+            width: 10px;
+            height: 10px;
+            bottom: -5px;
+            right: -5px;
+            cursor: se-resize;
+        }
+
+        .resizer.sw {
+            width: 10px;
+            height: 10px;
+            bottom: -5px;
+            left: -5px;
+            cursor: sw-resize;
+        }
+
+        .resizer.n {
+            width: calc(100% - 10px);
+            height: 5px;
+            top: -3px;
+            left: 5px;
+            cursor: n-resize;
+        }
+
+        .resizer.s {
+            width: calc(100% - 10px);
+            height: 5px;
+            bottom: -3px;
+            left: 5px;
+            cursor: s-resize;
+        }
+
+        .resizer.e {
+            width: 5px;
+            height: calc(100% - 10px);
+            top: 5px;
+            right: -3px;
+            cursor: e-resize;
+        }
+
+        .resizer.w {
+            width: 5px;
+            height: calc(100% - 10px);
+            top: 5px;
+            left: -3px;
+            cursor: w-resize;
+        }
+
         #console-settings-ui {
             position: fixed;
             top: 50%;
@@ -138,23 +194,26 @@
             color: white;
             padding: 20px;
             border-radius: 8px;
-            z-index: 10001; /* Ensure it's above everything */
+            z-index: 10001;
             display: none;
-            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
             font-family: sans-serif;
             min-width: 300px;
         }
+
         #console-settings-ui h3 {
             margin-top: 0;
             margin-bottom: 15px;
             text-align: center;
         }
+
         #console-settings-ui label {
             display: flex;
             align-items: center;
             justify-content: space-between;
             margin-bottom: 8px;
         }
+
         #console-settings-ui input[type="color"] {
             width: 60px;
             height: 25px;
@@ -162,10 +221,12 @@
             padding: 0;
             cursor: pointer;
         }
+
         #console-settings-ui input[type="range"] {
             flex-grow: 1;
             margin-left: 10px;
         }
+
         #console-settings-ui button {
             display: block;
             width: 100%;
@@ -178,6 +239,7 @@
             font-size: 16px;
             margin-top: 15px;
         }
+
         #console-settings-ui button:hover {
             background-color: #777;
         }
@@ -185,8 +247,8 @@
 </head>
 
 <body>
-    <div id="loading-text"
-        style="color: white; font-size: 48px; font-family: sans-serif; text-align: center; margin-top: 20px;"> LOADING...
+    <div id="loading-text">
+        LOADING...
     </div>
     <div hidden id="unity-container" class="unity-desktop">
         <canvas id="unity-canvas"></canvas>
@@ -199,26 +261,25 @@
         <div id="unity-mobile-warning"> WebGL builds are not supported on mobile devices. </div>
     </div>
 
-    <!-- HTML Elements for Console, FPS Viewer, and Instructions -->
-    <div id="instruction-text"
-        style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 10px 20px; border-radius: 5px; font-family: sans-serif; font-size: 16px; z-index: 1000; display: none;">
+    <div id="instruction-text">
         Press '1' to toggle console, Press '2' to toggle FPS
     </div>
+
     <div id="dev-console">
         <div id="dev-console-header">
             Developer Console
             <span id="console-settings-icon" style="cursor: pointer; margin-left: auto;">
-                <img src="icns/settings.png" alt="Settings" style="width: 1.2em; height: 1.2em; vertical-align: middle;">
+                <img src="https://icon-icons.com/download-file?file=https%3A%2F%2Fimages.icon-icons.com%2F685%2FPNG%2F512%2Fsettings_icon-icons.com_61211.png&id=61211&pack_or_individual=pack" alt="Settings" style="width: 1.2em; height: 1.2em; vertical-align: middle;">
             </span>
         </div>
         <div id="dev-console-output"></div>
     </div>
+
     <div id="fps-viewer">
         FPS: <span id="fps-value">0</span>
     </div>
 
-    <!-- Console Settings UI -->
-    <div id="console-settings-ui" style="display: none;">
+    <div id="console-settings-ui">
         <h3>Console Settings</h3>
         <label>Background Color: <input type="color" id="setting-bg-color" value="#000000"></label>
         <label>Header Color: <input type="color" id="setting-header-color" value="#000000"></label>
@@ -231,7 +292,55 @@
     </div>
 
     <script>
-        // --- Drag and Resize Functions (added to global scope) ---
+        // IndexedDB cache script
+        const DB_NAME = "cachedb";
+        const STORE_NAME = "files";
+
+        function openCacheDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(DB_NAME, 1);
+                req.onupgradeneeded = () => {
+                    const db = req.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME);
+                    }
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        async function saveToCache(key, blob) {
+            const db = await openCacheDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, "readwrite");
+                tx.objectStore(STORE_NAME).put(blob, key);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        }
+
+        async function loadFromCache(key) {
+            const db = await openCacheDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, "readonly");
+                const req = tx.objectStore(STORE_NAME).get(key);
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        async function deleteFromCache(key) {
+            const db = await openCacheDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, "readwrite");
+                tx.objectStore(STORE_NAME).delete(key);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        }
+
+        // --- Drag and Resize Helpers ---
         function makeDraggable(element, handle) {
             let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
             const dragHandle = handle || element;
@@ -242,11 +351,9 @@
             function dragMouseDown(e) {
                 e = e || window.event;
                 e.preventDefault();
-                // Get the mouse cursor position at startup:
                 pos3 = e.clientX;
                 pos4 = e.clientY;
                 document.onmouseup = closeDragElement;
-                // Call a function whenever the cursor moves:
                 document.onmousemove = elementDrag;
                 dragHandle.style.cursor = 'grabbing';
             }
@@ -254,12 +361,10 @@
             function elementDrag(e) {
                 e = e || window.event;
                 e.preventDefault();
-                // Calculate the new cursor position:
                 pos1 = pos3 - e.clientX;
                 pos2 = pos4 - e.clientY;
                 pos3 = e.clientX;
                 pos4 = e.clientY;
-                // Set the element's new position:\
                 element.style.top = (element.offsetTop - pos2) + "px";
                 element.style.left = (element.offsetLeft - pos1) + "px";
             }
@@ -272,7 +377,6 @@
         }
 
         function makeResizable(element, minWidth, minHeight) {
-            // Added side resizers: n, s, e, w
             const resizeHandles = ['nw', 'ne', 'se', 'sw', 'n', 's', 'e', 'w'];
 
             resizeHandles.forEach(direction => {
@@ -282,7 +386,7 @@
 
                 let currentResizer;
 
-                resizer.addEventListener('mousedown', function(e) {
+                resizer.addEventListener('mousedown', function (e) {
                     currentResizer = resizer;
                     e.preventDefault();
                     let startX = e.clientX;
@@ -319,17 +423,17 @@
                                 newLeft = startLeft + (e.clientX - startX);
                                 newTop = startTop + (e.clientY - startY);
                                 break;
-                            case 'n': // North resizer
+                            case 'n':
                                 newHeight = startHeight - (e.clientY - startY);
                                 newTop = startTop + (e.clientY - startY);
                                 break;
-                            case 's': // South resizer
+                            case 's':
                                 newHeight = startHeight + (e.clientY - startY);
                                 break;
-                            case 'e': // East resizer
+                            case 'e':
                                 newWidth = startWidth + (e.clientX - startX);
                                 break;
-                            case 'w': // West resizer
+                            case 'w':
                                 newWidth = startWidth - (e.clientX - startX);
                                 newLeft = startLeft + (e.clientX - startX);
                                 break;
@@ -352,17 +456,15 @@
                 });
             });
 
-            // Set initial size if not already set by CSS
             if (!element.style.width) element.style.width = '400px';
             if (!element.style.height) element.style.height = '200px';
-            element.style.position = 'absolute'; // Ensure it's positioned for resize
+            element.style.position = 'absolute';
         }
-        // --- End Common Functions ---
+        // --- End Drag and Resize ---
 
-        // Helper to convert hex to rgba
+        // Hex to RGBA helper
         function hexToRgba(hex, alpha) {
             let r = 0, g = 0, b = 0;
-            // Handle #rgb and #rrggbb
             if (hex.length === 4) {
                 r = parseInt(hex[1] + hex[1], 16);
                 g = parseInt(hex[2] + hex[2], 16);
@@ -375,45 +477,44 @@
             return `rgba(${r}, ${g}, ${b}, ${alpha})`;
         }
 
-        // Default console settings
+        // Console settings with default colors
         let consoleSettings = {
-            bgColor: '#000000', // Hex for black
-            headerColor: '#000000', // Hex for black
+            bgColor: '#000000',
+            headerColor: '#000000',
             opacity: 0.8,
-            logColor: '#00ff00', // Green
-            warnColor: '#ffff00', // Yellow
-            errorColor: '#ff0000'  // Red
+            logColor: '#00ff00',
+            warnColor: '#ffff00',
+            errorColor: '#ff0000'
         };
 
-        var loadingText = document.querySelector("#loading-text");
+        let loadingText = document.querySelector("#loading-text");
         let loadedBytes = 0;
 
-        // Get references to new elements
-        var instructionText = document.querySelector("#instruction-text");
-        var devConsole = document.querySelector("#dev-console");
-        var devConsoleHeader = document.querySelector("#dev-console-header"); // Get console header
-        var devConsoleOutput = document.querySelector("#dev-console-output"); // Get the dedicated output div
-        var fpsViewer = document.querySelector("#fps-viewer");
-        var fpsValue = document.querySelector("#fps-value");
+        // New elements references
+        let instructionText = document.querySelector("#instruction-text");
+        let devConsole = document.querySelector("#dev-console");
+        let devConsoleHeader = document.querySelector("#dev-console-header");
+        let devConsoleOutput = document.querySelector("#dev-console-output");
+        let fpsViewer = document.querySelector("#fps-viewer");
+        let fpsValue = document.querySelector("#fps-value");
 
-        var consoleSettingsUI = document.querySelector("#console-settings-ui");
-        var settingBgColor = document.getElementById("setting-bg-color");
-        var settingHeaderColor = document.getElementById("setting-header-color");
-        var settingOpacity = document.getElementById("setting-opacity");
-        var opacityValueSpan = document.getElementById("opacity-value");
-        var settingLogColor = document.getElementById("setting-log-color");
-        var settingWarnColor = document.getElementById("setting-warn-color");
-        var settingErrorColor = document.getElementById("setting-error-color");
-        var consoleSettingsIcon = document.getElementById("console-settings-icon");
-        var closeSettingsBtn = document.getElementById("close-settings-btn");
+        let consoleSettingsUI = document.querySelector("#console-settings-ui");
+        let settingBgColor = document.getElementById("setting-bg-color");
+        let settingHeaderColor = document.getElementById("setting-header-color");
+        let settingOpacity = document.getElementById("setting-opacity");
+        let opacityValueSpan = document.getElementById("opacity-value");
+        let settingLogColor = document.getElementById("setting-log-color");
+        let settingWarnColor = document.getElementById("setting-warn-color");
+        let settingErrorColor = document.getElementById("setting-error-color");
+        let consoleSettingsIcon = document.getElementById("console-settings-icon");
+        let closeSettingsBtn = document.getElementById("close-settings-btn");
 
-        // Console setup
+        // Wrap console methods to capture logs
         const originalConsoleLog = console.log;
         const originalConsoleWarn = console.warn;
         const originalConsoleError = console.error;
         let consoleVisible = false;
 
-        // Function to load settings from localStorage
         function loadConsoleSettings() {
             const savedSettings = localStorage.getItem('devConsoleSettings');
             if (savedSettings) {
@@ -421,13 +522,10 @@
             }
         }
 
-        // Function to apply settings to the console UI
         function applyConsoleSettings() {
-            // Apply background and header colors with opacity
             devConsole.style.backgroundColor = hexToRgba(consoleSettings.bgColor, consoleSettings.opacity);
             devConsoleHeader.style.backgroundColor = hexToRgba(consoleSettings.headerColor, consoleSettings.opacity);
 
-            // Update UI input values
             settingBgColor.value = consoleSettings.bgColor;
             settingHeaderColor.value = consoleSettings.headerColor;
             settingOpacity.value = consoleSettings.opacity;
@@ -436,28 +534,24 @@
             settingWarnColor.value = consoleSettings.warnColor;
             settingErrorColor.value = consoleSettings.errorColor;
 
-            // Re-apply colors to existing console output entries
             Array.from(devConsoleOutput.children).forEach(logEntry => {
-                const type = logEntry.dataset.logType; // Assuming we add a data-logType attribute
+                const type = logEntry.dataset.logType;
                 if (type === 'log') logEntry.style.color = consoleSettings.logColor;
                 else if (type === 'warn') logEntry.style.color = consoleSettings.warnColor;
                 else if (type === 'error') logEntry.style.color = consoleSettings.errorColor;
             });
         }
 
-        // Function to save settings to localStorage
         function saveConsoleSettings() {
             localStorage.setItem('devConsoleSettings', JSON.stringify(consoleSettings));
         }
 
-        // Function to toggle console settings UI
         function toggleConsoleSettingsUI() {
             if (consoleSettingsUI.style.display === 'block') {
                 consoleSettingsUI.style.display = 'none';
-                saveConsoleSettings(); // Save settings when closing
+                saveConsoleSettings();
             } else {
                 consoleSettingsUI.style.display = 'block';
-                // Ensure current console settings are reflected in the UI when opening
                 applyConsoleSettings();
             }
         }
@@ -467,31 +561,26 @@
             logEntry.style.marginBottom = '2px';
             logEntry.style.wordBreak = 'break-all';
             logEntry.style.whiteSpace = 'pre-wrap';
-            logEntry.dataset.logType = type; // Store the log type for re-coloring
+            logEntry.dataset.logType = type;
 
-            let color = consoleSettings.logColor; // Default from settings
-            if (type === 'warn') {
-                color = consoleSettings.warnColor;
-            } else if (type === 'error') {
-                color = consoleSettings.errorColor;
-            }
+            let color = consoleSettings.logColor;
+            if (type === 'warn') color = consoleSettings.warnColor;
+            else if (type === 'error') color = consoleSettings.errorColor;
             logEntry.style.color = color;
 
-            // Convert arguments to string, handling objects
             let formattedMessage = Array.from(message).map(arg => {
                 if (typeof arg === 'object' && arg !== null) {
                     try {
                         return JSON.stringify(arg, null, 2);
                     } catch (e) {
-                        return String(arg); // Fallback for circular structures
+                        return String(arg);
                     }
                 }
                 return String(arg);
             }).join(' ');
 
             logEntry.textContent = formattedMessage;
-            devConsoleOutput.appendChild(logEntry); // Append to the dedicated output div
-            // Scroll to bottom, only if console is visible
+            devConsoleOutput.appendChild(logEntry);
             if (consoleVisible) {
                 devConsoleOutput.scrollTop = devConsoleOutput.scrollHeight;
             }
@@ -514,12 +603,11 @@
             consoleVisible = !consoleVisible;
             devConsole.style.display = consoleVisible ? 'block' : 'none';
             if (consoleVisible) {
-                // Scroll to bottom when console becomes visible
                 devConsoleOutput.scrollTop = devConsoleOutput.scrollHeight;
             }
         }
 
-        // FPS Viewer setup
+        // FPS Viewer
         let fpsVisible = false;
         let lastFrameTime = performance.now();
         let frameCount = 0;
@@ -529,8 +617,7 @@
             const now = performance.now();
             frameCount++;
             const delta = now - lastFrameTime;
-
-            if (delta >= 1000) { // Update FPS every second
+            if (delta >= 1000) {
                 fps = Math.round((frameCount * 1000) / delta);
                 if (fpsVisible) {
                     fpsValue.textContent = fps;
@@ -546,15 +633,13 @@
             fpsViewer.style.display = fpsVisible ? 'block' : 'none';
         }
 
-        // Start FPS calculation loop
         requestAnimationFrame(calculateFps);
 
-        // Initialize drag and resize for console and FPS viewer
+        // Initialize drag and resize for dev console and fps viewer
         makeDraggable(devConsole, devConsoleHeader);
-        makeResizable(devConsole, 200, 100); // minWidth, minHeight
-        makeDraggable(fpsViewer, fpsViewer); // FPS viewer is draggable by itself
+        makeResizable(devConsole, 200, 100);
+        makeDraggable(fpsViewer, fpsViewer);
 
-        // Event listeners for console settings UI
         consoleSettingsIcon.addEventListener('click', toggleConsoleSettingsUI);
         closeSettingsBtn.addEventListener('click', toggleConsoleSettingsUI);
 
@@ -584,7 +669,6 @@
             applyConsoleSettings();
         });
 
-        // Keyboard event listener
         document.addEventListener('keydown', (event) => {
             if (event.key === '1') {
                 toggleConsole();
@@ -593,112 +677,117 @@
             }
         });
 
-        // Load and apply settings on script initialization
         loadConsoleSettings();
         applyConsoleSettings();
 
+        // Fetch with progress showing loaded / total MB
         async function fetchWithProgress(url) {
             const response = await fetch(url);
             const reader = response.body.getReader();
-            let chunks = [];
+            const chunks = [];
             let received = 0;
+            const totalBytes = 912.81 * 1024 * 1024; // total in bytes approx
             while (true) {
-                const {
-                    done,
-                    value
-                } = await reader.read();
+                const { done, value } = await reader.read();
                 if (done) break;
+                chunks.push(value);
                 received += value.length;
                 loadedBytes += value.length;
-                chunks.push(value);
-                let mbDone = (loadedBytes / (1024 * 1024)).toFixed(2);
-                // Hardcoded mbTotal bc the other one went past but only stored 730 so broken or smth
-                let mbTotal = '860.36';
+                const mbDone = (loadedBytes / (1024 * 1024)).toFixed(2);
+                const mbTotal = (totalBytes / (1024 * 1024)).toFixed(2);
                 loadingText.textContent = `LOADING... ${mbDone} MB / ${mbTotal} MB`;
             }
-            let fullBuffer = new Uint8Array(received);
+            const fullBuffer = new Uint8Array(received);
             let offset = 0;
-            for (let chunk of chunks) {
+            for (const chunk of chunks) {
                 fullBuffer.set(chunk, offset);
                 offset += chunk.length;
             }
             return fullBuffer.buffer;
         }
-        async function mergeFiles(fileParts) {
+
+        async function mergeFiles(fileParts, cacheKey) {
+            const cached = await loadFromCache(cacheKey);
+            if (cached) {
+                return URL.createObjectURL(cached);
+            }
             const buffers = await Promise.all(fileParts.map(part => fetchWithProgress(part)));
             const mergedBlob = new Blob(buffers);
+            await saveToCache(cacheKey, mergedBlob);
             return URL.createObjectURL(mergedBlob);
         }
 
         function getParts(file, start, end) {
-            let parts = [];
+            const parts = [];
             for (let i = start; i <= end; i++) {
                 parts.push(file + ".part" + i);
             }
             return parts;
         }
+
         (async () => {
-            const [dataUrl, wasmurl] = await Promise.all([
-                mergeFiles(getParts("Build/hk.data", 1, 42)),
-                mergeFiles(getParts("Build/hk.wasm", 1, 2)),
+            const [dataUrl, wasmUrl] = await Promise.all([
+                mergeFiles(getParts("Build/hktruffled.data", 1, 45), "hktruffled.data"),
+                mergeFiles(getParts("Build/hktruffled.wasm", 1, 2), "hktruffled.wasm"),
             ]);
-            var buildUrl = "Build";
-            var loaderUrl = buildUrl + "/hk.loader.js";
-            var config = {
+
+            const buildUrl = "Build";
+            const loaderUrl = `${buildUrl}/hktruffled.loader.js`;
+            const config = {
                 dataUrl: dataUrl,
-                frameworkUrl: buildUrl + "/hk.framework.js",
-                codeUrl: wasmurl,
+                frameworkUrl: `${buildUrl}/hktruffled.framework.js`,
+                codeUrl: wasmUrl,
                 streamingAssetsUrl: "StreamingAssets",
-                companyName: "Team Cherry & HummingTech",
+                companyName: "Team Cherry & Truffled",
                 productName: "Hollow Knight",
-                productVersion: "1.0",
+                productVersion: "1.1",
             };
 
-            // Forces devicePixelRatio to 1 for all systems to reduce rendering workload.
-            config.devicePixelRatio = 1;
+            const container = document.querySelector("#unity-container");
+            const canvas = document.querySelector("#unity-canvas");
+            const loadingBar = document.querySelector("#unity-loading-bar");
+            const progressBarFull = document.querySelector("#unity-progress-bar-full");
+            const mobileWarning = document.querySelector("#unity-mobile-warning");
 
-            var container = document.querySelector("#unity-container");
             container.hidden = false;
-            var canvas = document.querySelector("#unity-canvas");
-            var loadingBar = document.querySelector("#unity-loading-bar");
-            var progressBarFull = document.querySelector("#unity-progress-bar-full");
-            var mobileWarning = document.querySelector("#unity-mobile-warning");
 
-            // Corrected mobile detection logic
             if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                var meta = document.createElement('meta');
-                meta.name = 'viewport';
-                meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-                document.getElementsByTagName('head')[0].appendChild(meta);
                 container.className = "unity-mobile";
-                canvas.className = "unity-mobile"; // Ensure canvas also gets mobile class
+                config.devicePixelRatio = 1;
                 mobileWarning.style.display = "block";
                 setTimeout(() => {
                     mobileWarning.style.display = "none";
                 }, 5000);
             } else {
-                // Desktop setup: Unity will manage canvas size within the 100% width/height container
+                function resizeCanvas() {
+                    canvas.width = window.innerWidth;
+                    canvas.height = window.innerHeight;
+                    canvas.style.width = `${window.innerWidth}px`;
+                    canvas.style.height = `${window.innerHeight}px`;
+                }
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
             }
 
             loadingBar.style.display = "block";
-            loadingText.style.display = "none"; // Hide custom loading text when Unity's loading bar appears
 
-            var script = document.createElement("script");
+            const script = document.createElement("script");
             script.src = loaderUrl;
             script.onload = () => {
                 createUnityInstance(canvas, config, (progress) => {
                     progressBarFull.style.width = 100 * progress + "%";
-                }).then((unityInstance) => {
-                    loadingText.remove(); // Remove the hidden loading text element
+                }).then(() => {
+                    loadingText.remove();
                     loadingBar.style.display = "none";
                     canvas.style.display = "block";
 
                     instructionText.style.display = "block";
                     setTimeout(() => {
                         instructionText.style.display = "none";
-                    }, 5000); // Hide after 5 seconds
+                    }, 5000);
 
-                }).catch((message) => {
+                }).catch(async (message) => {
+                    await deleteFromCache("hktruffled.wasm");
                     alert(message);
                 });
             };
